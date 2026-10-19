@@ -1,2 +1,2 @@
-# Y-lan-Oyunu
+# Ylan-Oyunu
 HTML CSS JavaScript Snake Game
