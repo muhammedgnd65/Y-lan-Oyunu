@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yılan Oyunu</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #101827;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.game {
+  width: min(94vw, 440px);
+  text-align: center;
+}
+
+h1 {
+  color: #4ade80;
+  margin-bottom: 12px;
+}
+
+.scores {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+
+.score-box {
+  background: #243247;
+  padding: 12px;
+  border-radius: 10px;
+  flex: 1;
+}
+
+canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  border: 3px solid #4ade80;
+  border-radius: 10px;
+  background: #0b1220;
+}
+
+button {
+  border: none;
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-size: 17px;
+  font-weight: bold;
+  cursor: pointer;
+  color: white;
+  background: #16a34a;
+}
+
+button:active {
+  transform: scale(.96);
+}
+
+#start {
+  margin: 14px 0;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(3, 65px);
+  gap: 8px;
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.controls button {
+  padding: 13px 0;
+  background: #334155;
+  font-size: 22px;
+  touch-action: manipulation;
+}
+
+.controls .empty {
+  visibility: hidden;
+}
+
+#message {
+  color: #cbd5e1;
+  min-height: 24px;
+}
+</style>
+</head>
+
+<body>
+<div class="game">
+  <h1>🐍 YILAN OYUNU</h1>
+
+  <div class="scores">
+    <div class="score-box">
+      🍎 Skor: <b id="score">0</b>
+    </div>
+    <div class="score-box">
+      🏆 Rekor: <b id="best">0</b>
+    </div>
+  </div>
+
+  <canvas id="board" width="400" height="400"></canvas>
+
+  <button id="start">Oyunu Başlat</button>
+
+  <div class="controls">
+    <button class="empty"> </button>
+    <button data-dir="up">⬆️</button>
+    <button class="empty"> </button>
+
+    <button data-dir="left">⬅️</button>
+    <button data-dir="down">⬇️</button>
+    <button data-dir="right">➡️</button>
+  </div>
+
+  <p id="message">Başlamak için düğmeye bas!</p>
+  <p>Kontroller: Ok tuşları veya WASD</p>
+</div>
+
+<script>
+const canvas = document.getElementById("board");
+const ctx = canvas.getContext("2d");
+
+const size = 20;
+const cells = canvas.width / size;
+
+let snake, food, direction, nextDirection;
+let score = 0;
+let best = 0;
+let timer = null;
+let running = false;
+let gameOver = false;
+
+const scoreEl = document.getElementById("score");
+const bestEl = document.getElementById("best");
+const message = document.getElementById("message");
+const startBtn = document.getElementById("start");
+
+function resetGame() {
+  snake = [
+    { x: 10, y: 10 },
+    { x: 9, y: 10 },
+    { x: 8, y: 10 }
+  ];
+
+  direction = { x: 1, y: 0 };
+  nextDirection = { x: 1, y: 0 };
+  score = 0;
+
+  createFood();
+
+  scoreEl.textContent = score;
+  running = true;
+  gameOver = false;
+
+  clearInterval(timer);
+  timer = setInterval(update, 115);
+
+  startBtn.textContent = "Yeniden Başlat";
+  message.textContent = "Yemleri topla ve büyü!";
+  draw();
+}
+
+function createFood() {
+  do {
+    food = {
+      x: Math.floor(Math.random() * cells),
+      y: Math.floor(Math.random() * cells)
+    };
+  } while (
+    snake && snake.some(
+      part => part.x === food.x && part.y === food.y
+    )
+  );
+}
+
+function update() {
+  if (!running) return;
+
+  direction = { ...nextDirection };
+
+  const head = {
+    x: snake[0].x + direction.x,
+    y: snake[0].y + direction.y
+  };
+
+  const ate = head.x === food.x && head.y === food.y;
+
+  // Duvara çarpma
+  if (
+    head.x < 0 || head.x >= cells ||
+    head.y < 0 || head.y >= cells
+  ) {
+    endGame();
+    return;
+  }
+
+  // Kuyruğa çarpma
+  // Yem yemiyorsak kuyruk bu turda hareket eder.
+  const body = ate ? snake : snake.slice(0, -1);
+
+  if (body.some(part => part.x === head.x && part.y === head.y)) {
+    endGame();
+    return;
+  }
+
+  snake.unshift(head);
+
+  if (ate) {
+    score += 10;
+    scoreEl.textContent = score;
+
+    if (score > best) {
+      best = score;
+      bestEl.textContent = best;
+    }
+
+    createFood();
+  } else {
+    snake.pop();
+  }
+
+  draw();
+}
+
+function draw() {
+  ctx.fillStyle = "#0b1220";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Izgara
+  ctx.strokeStyle = "#172438";
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= cells; i++) {
+    ctx.beginPath();
+    ctx.moveTo(i * size, 0);
+    ctx.lineTo(i * size, canvas.height);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(0, i * size);
+    ctx.lineTo(canvas.width, i * size);
+    ctx.stroke();
+  }
+
+  // Yem
+  ctx.fillStyle = "#fb3d52";
+  ctx.beginPath();
+  ctx.arc(
+    food.x * size + size / 2,
+    food.y * size + size / 2,
+    size / 2 - 2,
+    0, Math.PI * 2
+  );
+  ctx.fill();
+
+  // Yılan
+  snake.forEach((part, index) => {
+    ctx.fillStyle = index === 0 ? "#86efac" : "#22c55e";
+
+    ctx.beginPath();
+    ctx.roundRect(
+      part.x * size + 1,
+      part.y * size + 1,
+      size - 2,
+      size - 2,
+      5
+    );
+    ctx.fill();
+  });
+
+  // Gözler
+  const head = snake[0];
+  const cx = head.x * size + size / 2;
+  const cy = head.y * size + size / 2;
+
+  ctx.fillStyle = "#102018";
+
+  const eyePositions = direction.x !== 0
+    ? [
+        [cx + direction.x * 4, cy - 5],
+        [cx + direction.x * 4, cy + 5]
+      ]
+    : [
+        [cx - 5, cy + direction.y * 4],
+        [cx + 5, cy + direction.y * 4]
+      ];
+
+  eyePositions.forEach(([x, y]) => {
+    ctx.beginPath();
+    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function endGame() {
+  running = false;
+  gameOver = true;
+  clearInterval(timer);
+
+  message.textContent = "Oyun bitti! Skorun: " + score;
+  startBtn.textContent = "Tekrar Oyna";
+
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(0, 145, canvas.width, 110);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.font = "bold 28px Arial";
+  ctx.fillText("OYUN BİTTİ!", canvas.width / 2, 192);
+
+  ctx.font = "18px Arial";
+  ctx.fillText(
+    "Skor: " + score,
+    canvas.width / 2,
+    224
+  );
+}
+
+function changeDirection(dir) {
+  if (!running) return;
+
+  const dirs = {
+    up:    { x: 0, y: -1 },
+    down:  { x: 0, y: 1 },
+    left:  { x: -1, y: 0 },
+    right: { x: 1, y: 0 }
+  };
+
+  const d = dirs[dir];
+  if (!d) return;
+
+  // Yılan kendi üzerine ters dönemez.
+  if (
+    d.x === -direction.x &&
+    d.y === -direction.y
+  ) return;
+
+  nextDirection = d;
+}
+
+document.addEventListener("keydown", event => {
+  const key = event.key.toLowerCase();
+
+  const controls = {
+    arrowup: "up", w: "up",
+    arrowdown: "down", s: "down",
+    arrowleft: "left", a: "left",
+    arrowright: "right", d: "right"
+  };
+
+  if (controls[key]) {
+    event.preventDefault();
+    changeDirection(controls[key]);
+  }
+});
+
+document.querySelectorAll("[data-dir]").forEach(button => {
+  button.addEventListener("click", () => {
+    changeDirection(button.dataset.dir);
+  });
+});
+
+startBtn.addEventListener("click", resetGame);
+
+// İlk ekran
+snake = [
+  { x: 10, y: 10 },
+  { x: 9, y: 10 },
+  { x: 8, y: 10 }
+];
+
+direction = { x: 1, y: 0 };
+nextDirection = { x: 1, y: 0 };
+createFood();
+draw();
+</script>
+</body>
+</html>
+
